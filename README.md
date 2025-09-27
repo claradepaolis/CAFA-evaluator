@@ -55,6 +55,8 @@ sub-folders are processed recursively and the sub-folder name is used as prefix 
 Example input files are provided inside the `data/example` folder. If you have installed the software using pip,
 the folder is located in the Python `site-packages` directory.
 
+* _**NEW**_: **Terms of Interst file** contains term names that appear in the OBO file to be included in evaluation
+
 ### Command line
 
 When executed from the command line the script logs information about the calculation in the console (standard error) and
@@ -70,6 +72,11 @@ cafaeval ontology_file prediction_folder ground_truth_file
 If you simply cloned the repository:
 ```bashcon
 python3 /path/to/CAFA-evaluator/src/cafaeval/__main__.py ontology_file prediction_folder ground_truth_file
+```
+
+_**NEW**_: By default, all terms in the ontology will be considered in the evaluation. To include only specific terms, provide a terms-of-interest file
+```bashcon
+python3 /path/to/CAFA-evaluator/src/cafaeval/__main__.py ontology_file prediction_folder ground_truth_file -toi terms_of_interest_file
 ```
 
 ### Library
@@ -172,6 +179,19 @@ IDPO:00025  0.56
 ...
 ```
 
+_**NEW**_: **Terms of Interest (optional)** - File with term ID to include in evaluation for all proteins, one ID per line.  
+If not provided, all terms will be used in evaluation. 
+This file is used to specify terms that will be evaluated, usually used to exclude terms in the ontology that have since
+been obsoleted or are not of interest for the evaluation.
+
+```
+GO:0055039
+GO:0072523
+GO:0003882
+GO:0010139
+...
+```
+
 ## Output files
 
 Output files are generated in the `results` folder. The same files are gerated by both
@@ -190,6 +210,7 @@ A different file for each metric is created.
 |:-----------:|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |   -out_dir  |   'results' | Output directory (tsv files + log). Either relative to current path or absolute                                                                                                                                                                            |
 |     -ia     |            | Information accretion file                                                                                                                                                                                                                                 |
+|    -toi     |            | Terms of interest file   (terms considered for all proteins)                                                                                                                                                                                                              |
 | -no_orphans |  False (flag) | Exclude orphans nodes (e.g. roots) from the calculation                                                                                                                                                                                                    |
 |    -norm    |     'cafa'  | Normalization strategy. `cafa` normalize precision by the number of predicted targets and recall by the number of targets in the ground truth. `pred` normalize by the number of  predicted targets. `gt` normalize by the number of ground truth proteins |
 |    -prop    |     'max'  | Ancestor propagation strategy. `max` propagate the max score of the traversed subgraph iteratively. `fill` propagate with max until a different score is found                                                                                             |

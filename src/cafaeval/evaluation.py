@@ -4,7 +4,7 @@ import pandas as pd
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 from itertools import repeat
-from cafaeval.parser import obo_parser, gt_parser, pred_parser
+from cafaeval.parser import obo_parser, gt_parser, pred_parser, update_toi
 import logging
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -79,10 +79,13 @@ def compute_metrics(pred, gt, tau_arr, toi, ic_arr=None, n_cpu=0):
         n_cpu = mp.cpu_count()
 
     columns = ["n", "tp", "fp", "fn", "pr", "rc"]
-
+    # filter out proteins with no annotations in Terms-Of-Interest (toi)
+    proteins_has_gt = gt.matrix[:, toi].sum(1) > 0
+    proteins_with_gt = np.where(proteins_has_gt)[0]
+    gt_with_annots = gt.matrix[proteins_with_gt, :]
     # Slice once and reuse (shared by all threads)
-    g = gt.matrix[:, toi]
-    pred_sub = pred.matrix[:, toi]
+    g = gt_with_annots[:, toi]
+    pred_sub = pred.matrix[proteins_has_gt, :][:, toi]
     w = None if ic_arr is None else ic_arr[toi]
 
     # Precompute n_gt once
@@ -147,11 +150,19 @@ def evaluate_prediction(prediction, gt, ontologies, tau_arr, normalization='cafa
     dfs = []
     dfs_w = []
     for ns in prediction:
-        ne = np.full(len(tau_arr), gt[ns].matrix[:, ontologies[ns].toi].shape[0])
-        dfs.append(normalize(compute_metrics(prediction[ns], gt[ns], tau_arr, ontologies[ns].toi, None, n_cpu), ns, tau_arr, ne, normalization))
+        # number of proteins with positive annotations
+        proteins_has_gt = gt[ns].matrix[:, ontologies[ns].toi].sum(1) > 0
+        proteins_with_gt = np.where(proteins_has_gt)[0]
+        num_annot_prots = proteins_has_gt.sum()  # number of proteins with positive annotations in TOIs
+        ne = np.full(len(tau_arr), num_annot_prots)
+        dfs.append(normalize(compute_metrics(prediction[ns], gt[ns], tau_arr, ontologies[ns].toi, None, n_cpu),
+                   ns, tau_arr, ne, normalization))
 
         if ontologies[ns].ia is not None:
-            ne = np.full(len(tau_arr), gt[ns].matrix[:, ontologies[ns].toi_ia].shape[0])
+            # number of proteins with positive annotations
+            proteins_has_gt = gt[ns].matrix[:, ontologies[ns].toi_ia].sum(1) > 0
+            num_annot_prots = (proteins_has_gt).sum()
+            ne = np.full(len(tau_arr), num_annot_prots)
             dfs_w.append(normalize(compute_metrics(prediction[ns], gt[ns], tau_arr, ontologies[ns].toi_ia, ontologies[ns].ia, n_cpu), ns, tau_arr, ne, normalization))
 
     dfs = pd.concat(dfs)
@@ -164,13 +175,16 @@ def evaluate_prediction(prediction, gt, ontologies, tau_arr, normalization='cafa
     return dfs
 
 
-def cafa_eval(obo_file, pred_dir, gt_file, ia=None, no_orphans=False, norm='cafa', prop='max', max_terms=None, th_step=0.01, n_cpu=1):
+def cafa_eval(obo_file, pred_dir, gt_file, ia=None, no_orphans=False, 
+              norm='cafa', prop='max', toi_file=None, max_terms=None, th_step=0.01, n_cpu=1):
 
     # Tau array, used to compute metrics at different score thresholds
     tau_arr = np.arange(th_step, 1, th_step)
 
     # Parse the OBO file and creates a different graphs for each namespace
     ontologies = obo_parser(obo_file, ("is_a", "part_of"), ia, not no_orphans)
+    if toi_file is not None:
+        ontologies = update_toi(ontologies, toi_file)
 
     # Parse ground truth file
     gt = gt_parser(gt_file, ontologies)

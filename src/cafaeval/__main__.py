@@ -27,6 +27,11 @@ def command_line():
     parser.add_argument('-prop', choices=['max', 'fill'], default='max',
                         help='Ancestor propagation strategy. max - Propagate the max score of the traversed subgraph '
                              'iteratively. fill - Propagate with max until a different score is found')
+    parser.add_argument('-toi', default=None,
+                        help='File with GO IDs for terms of interest on which to evaluate. '
+                             'Usually, this is to exclude terms that were removed from GO '
+                             'since evaluation obo file was created. If None (default), all terms will be'
+                             'included in evaluation, possibly excluding roots if -no_orphans is passed')                             
     parser.add_argument('-th_step', type=float, default=0.01,
                         help='Threshold step size in the range [0, 1). A smaller step, means more calculation')
     parser.add_argument('-max_terms', type=int, default=None,
@@ -50,6 +55,7 @@ def command_line():
     # Run the evaluation
     df, dfs_best = cafa_eval(args.obo_file, args.pred_dir, args.gt_file,
                              ia=args.ia, no_orphans=args.no_orphans, norm=args.norm, prop=args.prop,
+                             toi_file=args.toi,
                              max_terms=args.max_terms, th_step=args.th_step, n_cpu=args.threads)
 
     # Write the results
